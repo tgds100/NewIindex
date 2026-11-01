@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060a0f">
+  <meta name="description" content="NEON GRID — 一片活着的霓虹坐标场。移动光标激起涟漪，点击落点生长节点。">
+  <title>NEON GRID丨坐标引擎</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M12 2 22 12 12 22 2 12Z' stroke='%23ffb000' stroke-width='1.6'/><circle cx='12' cy='12' r='2.4' fill='%23ffb000'/></svg>">
+
+  <!-- 字体：展示字 Chakra Petch + 等宽 JetBrains Mono + 中文 Noto Sans SC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* 颜色：近黑冷调主色 + 单一信号琥珀强调 */
+      --bg:        #060a0f;
+      --surface:   #0d141c;
+      --surface-2: #111c26;
+      --text:      #e6f0f5;
+      --muted:     #6b8290;
+      --accent:    #ffb000;
+      --accent-dim:#7a5500;
+      --line:      rgba(120, 200, 230, .14);
+
+      /* 字阶（模块化） */
+      --fs-display: clamp(48px, 8.5vw, 116px);
+      --fs-h2:      clamp(26px, 3.4vw, 44px);
+      --fs-eyebrow: 11px;
+      --fs-body:    15px;
+      --fs-mono:    12px;
+
+      /* 间距 */
+      --s1: 4px; --s2: 8px; --s3: 16px; --s4: 24px;
+      --s5: 40px; --s6: 64px; --s7: 96px;
+
+      /* 动效 */
+      --ease: cubic-bezier(.16, 1, .3, 1);
+      --dur-fast: 160ms; --dur-base: 320ms; --dur-slow: 640ms;
+
+      --radius: 2px;
+      --maxw: 1320px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Noto Sans SC", system-ui, sans-serif;
+      font-size: var(--fs-body);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 活着的霓虹网格画布：固定铺满，置于内容之下 */
+    #field {
+      position: fixed; inset: 0; z-index: 0;
+      display: block; width: 100%; height: 100%;
+    }
+
+    /* 氛围层：暗角 + 颗粒噪点 */
+    .vignette {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(120% 90% at 50% 18%, transparent 38%, rgba(3,5,8,.72) 100%);
+    }
+    .grain {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .05;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* 自定义光标（仅精确指针设备） */
+    .cursor {
+      position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;
+      width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+      border: 1px solid var(--accent);
+      box-shadow: 0 0 12px rgba(255,176,0,.6);
+      mix-blend-mode: difference;
+      transition: width var(--dur-fast) var(--ease), height var(--dur-fast) var(--ease), opacity var(--dur-fast);
+      opacity: 0;
+    }
+    .cursor.dot { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; background: var(--accent); }
+    @media (pointer: fine) {
+      body.cursor-on, body.cursor-on a, body.cursor-on button { cursor: none; }
+      body.cursor-on .cursor { opacity: 1; }
+    }
+
+    .stage { position: relative; z-index: 2; }
+
+    /* 顶部状态栏 */
+    .topbar {
+      width: min(var(--maxw), calc(100% - 56px)); margin-inline: auto;
+      height: 72px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      font-family: "JetBrains Mono", monospace; font-size: var(--fs-mono); letter-spacing: .12em;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
+    .brand-mark { width: 22px; height: 22px; flex: none; filter: drop-shadow(0 0 8px rgba(255,176,0,.5)); }
+    .brand-mark path, .brand-mark circle { vector-effect: non-scaling-stroke; }
+    .brand-mark .ring { stroke: var(--accent); fill: none; stroke-width: 1.4; }
+    .brand-mark .core { fill: var(--accent); stroke: none; }
+    .brand-mark .tick { stroke: var(--accent); stroke-width: 1; opacity: .55; }
+    .brand-name { font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 14px; letter-spacing: .22em; }
+    .brand-sub { color: var(--muted); font-size: 10px; letter-spacing: .26em; }
+    .status { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+    .status .live { color: var(--accent); display: flex; align-items: center; gap: 7px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: blink 1.6s infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* 主区 */
+    main {
+      width: min(var(--maxw), calc(100% - 56px)); margin-inline: auto;
+      min-height: calc(100svh - 72px - 56px);
+      display: grid; align-items: center;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: var(--s6);
+      padding: var(--s6) 0;
+    }
+    .hero { max-width: 760px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 12px; margin-bottom: var(--s4);
+      font-family: "JetBrains Mono", monospace; font-size: var(--fs-eyebrow);
+      letter-spacing: .34em; text-transform: uppercase; color: var(--accent);
+    }
+    .eyebrow::before { content: ""; width: 34px; height: 1px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    h1 {
+      margin: 0; font-family: "Chakra Petch", sans-serif; font-weight: 700;
+      font-size: var(--fs-display); line-height: .98; letter-spacing: -.02em;
+    }
+    h1 .accent {
+      color: transparent;
+      background: linear-gradient(100deg, var(--accent), #ffd76b 70%);
+      -webkit-background-clip: text; background-clip: text;
+      filter: drop-shadow(0 0 22px rgba(255,176,0,.35));
+    }
+    .intro { max-width: 480px; margin: var(--s4) 0 0; color: #aebfc8; font-size: 15px; line-height: 1.95; }
+    .actions { display: flex; align-items: center; gap: var(--s4); margin-top: var(--s5); flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 24px;
+      border: 0; cursor: pointer; text-decoration: none;
+      font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 13px; letter-spacing: .14em;
+      color: #0a0a0a; background: var(--accent);
+      box-shadow: 0 0 26px rgba(255,176,0,.32);
+      transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    }
+    .btn:hover { transform: translateY(-3px); box-shadow: 0 0 40px rgba(255,176,0,.5); }
+    .btn:active { transform: translateY(-1px); }
+    .btn .arrow { font-size: 18px; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 9px; min-height: 52px; padding: 0 6px;
+      text-decoration: none; color: var(--text); font-size: 13px; letter-spacing: .1em;
+      border-bottom: 1px solid transparent; transition: border-color var(--dur-fast), color var(--dur-fast);
+    }
+    .btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
+    .btn-ghost .a { color: var(--accent); }
+
+    /* HUD 遥测面板 */
+    .hud {
+      align-self: center;
+      border: 1px solid var(--line); background: rgba(13,20,28,.55);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      padding: 20px; position: relative;
+    }
+    .hud::before { content: ""; position: absolute; left: -1px; top: -1px; width: 70px; height: 1px;
+      background: linear-gradient(90deg, var(--accent), transparent); box-shadow: 0 0 10px var(--accent); }
+    .hud-title { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .24em;
+      color: var(--muted); display: flex; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+    .hud-title b { color: var(--accent); font-weight: 500; }
+    .metric { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(120,200,230,.07); }
+    .metric:last-child { border-bottom: 0; }
+    .metric .k { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .18em; color: var(--muted); }
+    .metric .v { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 28px; letter-spacing: .02em;
+      font-variant-numeric: tabular-nums; color: var(--text); }
+    .metric .v small { font-size: 13px; color: var(--muted); margin-left: 2px; }
+    .metric.hot .v { color: var(--accent); text-shadow: 0 0 18px rgba(255,176,0,.4); }
+    .metric .k { display: inline-flex; align-items: center; gap: 8px; }
+    .ic { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .metric.hot .ic { color: var(--accent); }
+    .btn .ic, .btn-ghost .ic { width: 16px; height: 16px; }
+    .cue .ic { width: 14px; height: 14px; }
+
+    /* 底部坐标带 */
+    .footer {
+      width: min(var(--maxw), calc(100% - 56px)); margin-inline: auto;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+      padding: 18px 0 26px; border-top: 1px solid var(--line);
+      font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .14em; color: var(--muted);
+    }
+    .coords { display: flex; gap: var(--s4); flex-wrap: wrap; }
+    .coords b { color: var(--text); font-weight: 500; }
+    .cue { display: inline-flex; align-items: center; gap: 10px; color: var(--accent); }
+    .cue i { display: block; width: 1px; height: 22px; background: linear-gradient(var(--accent), transparent); animation: drop 1.8s infinite; }
+    @keyframes drop { 0%,100% { opacity: .4; transform: scaleY(.6); transform-origin: top; } 50% { opacity: 1; transform: scaleY(1); } }
+
+    /* 入场序列：编排一次错峰揭示 */
+    .reveal { opacity: 0; transform: translateY(26px); }
+    .run .reveal { animation: rise var(--dur-slow) var(--ease) forwards; }
+    .run .reveal:nth-child(1) { animation-delay: 60ms; }
+    .run .reveal:nth-child(2) { animation-delay: 160ms; }
+    .run .reveal:nth-child(3) { animation-delay: 260ms; }
+    .run .reveal:nth-child(4) { animation-delay: 360ms; }
+    .run .reveal:nth-child(5) { animation-delay: 460ms; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+
+    /* 焦点可见，键盘可达 */
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    /* 响应式 */
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; gap: var(--s5); padding-block: var(--s5); }
+      .hud { align-self: stretch; }
+      .topbar, main, .footer { width: calc(100% - 40px); }
+    }
+    @media (max-width: 560px) {
+      .topbar { height: 60px; }
+      .brand-sub { display: none; }
+      .status .label { display: none; }
+      main { min-height: auto; }
+      .actions { gap: var(--s3); }
+      .btn, .btn-ghost { min-height: 48px; }
+    }
+
+    /* 降级动效 */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body class="cursor-on">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" id="cursor" aria-hidden="true"></div>
+
+  <div class="stage">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="NEON GRID 首页">
+        <svg class='brand-mark' viewBox='0 0 24 24' fill='none' aria-hidden='true'>
+          <path class='ring' d='M12 2 22 12 12 22 2 12Z'/>
+          <circle class='core' cx='12' cy='12' r='2.4'/>
+          <path class='tick' d='M12 6V9M12 15v3M6 12h3M15 12h3'/>
+        </svg>
+        <span>
+          <span class="brand-name">NEON GRID</span><br>
+          <span class="brand-sub">坐标引擎 / GRID ENGINE</span>
+        </span>
+      </a>
+      <div class="status">
+        <span class="live"><i class="dot" aria-hidden="true"></i>SYSTEM ONLINE</span>
+        <span class="label">· <span id="clock">--:--:--</span></span>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="title">
+        <div class="eyebrow reveal">LIVE COORDINATE FIELD · 坐标场已激活</div>
+        <h1 id="title" class="reveal">
+          让网格<br><span class="accent">为你生长。</span>
+        </h1>
+        <p class="intro reveal">
+          移动光标，涟漪在坐标场上扩散，线条瞬间染成信号琥珀；
+          点击落点，节点自动连成网络。这不是背景动画，而是一片活着的网格。
+        </p>
+        <div class="actions reveal">
+          <button class="btn" id="activate" type="button"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><path d='M13 2 4 14h7l-1 8 9-12h-7z'/></svg>激活坐标场</button>
+          <a class="btn-ghost" href="#telemetry"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><path d='M6 3h9l4 4v14H6z'/><path d='M9 12h6M9 16h6'/></svg>查看节点日志 <span class="a" aria-hidden="true">→</span></a>
+        </div>
+      </section>
+
+      <aside class="hud reveal" id="telemetry" aria-label="坐标场遥测面板">
+        <div class="hud-title"><span>FIELD TELEMETRY</span><b id="t-state">ACTIVE</b></div>
+        <div class="metric hot"><span class="k"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><circle cx='6' cy='6' r='2'/><circle cx='18' cy='6' r='2'/><circle cx='12' cy='18' r='2'/><path d='M7.5 7.4 11 16M16.5 7.4 13 16M8 6h8'/></svg>NODES 节点</span><span class="v" id="m-nodes">0</span></div>
+        <div class="metric"><span class="k"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><path d='M3 12h5l2-6 3 12 2-6h6'/></svg>PULSE 脉冲</span><span class="v" id="m-pulse">0<small>%</small></span></div>
+        <div class="metric"><span class="k"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><path d='M3 12c3-7 6-7 9 0s6 7 9 0'/></svg>FREQ 频率</span><span class="v" id="m-freq">432<small>Hz</small></span></div>
+        <div class="metric"><span class="k"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='8.5'/><path d='M12 7.5V12l3 2'/></svg>UPTIME 在线</span><span class="v" id="m-up">00:00</span></div>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <div class="coords">
+        <span>SECTOR <b>NEO-07</b></span>
+        <span>LAT <b id="f-lat">35°41′N</b></span>
+        <span>FREQ <b>432 Hz</b></span>
+      </div>
+      <div class="cue"><svg class='ic' viewBox='0 0 24 24' aria-hidden='true'><path d='M5 3l14 8-6 1.5L11 21z'/></svg><i aria-hidden="true"></i><span>移动光标，激起涟漪</span></div>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- 活着的网格：线框地形 + 涟漪位移场 ---------- */
+  const cv = document.getElementById("field");
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  const COLS = 26, ROWS = 15;          // 网格分辨率
+  const ripples = [];                  // 鼠标/点击产生的涟漪
+  const nodes = [];                    // 点击落下的节点
+  const edges = [];                    // 节点之间的连线
+  let lastSpawn = 0;
+
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize); resize();
+
+  // 将网格顶点 (u,v) 投到屏幕，叠加高度 h（涟漪/基底）
+  function project(u, v, h) {
+    const depth = 0.16 + (1 - 0.16) * v;        // 远处小、近处大（伪 3D 倾斜）
+    const planeW = W * 1.7, planeD = H * 1.15;
+    const worldX = (u - 0.5) * planeW;
+    const baseY = (v - 0.12) * planeD;
+    const hor = H * 0.30;
+    return {
+      x: W / 2 + worldX * depth,
+      y: hor + baseY * depth - h * depth
+    };
+  }
+
+  // 在屏幕坐标 (sx,sy) 处计算高度（基底微动 + 各涟漪叠加）
+  function heightAt(u, v, sx, sy, now) {
+    let h = Math.sin(u * 5 + now * 0.0009) * Math.cos(v * 4 - now * 0.0007) * 5;
+    for (const r of ripples) {
+      const age = (now - r.t0) / 1000;
+      const radius = r.speed * age;
+      const d = Math.hypot(sx - r.x, sy - r.y);
+      const env = Math.exp(-((d - radius) ** 2) / (2 * r.w * r.w)) * Math.exp(-age * 1.1);
+      h += r.amp * Math.sin((d - radius) * r.k) * env;
+    }
+    return h;
+  }
+
+  // 颜色：冷钢青 -> 琥珀，随 |h| 过渡
+  function strokeFor(h, depth) {
+    const mag = Math.min(1, Math.abs(h) / 26);
+    const lr = Math.round(120 + (255 - 120) * mag);
+    const lg = Math.round(200 + (176 - 200) * mag);
+    const lb = Math.round(230 + (0 - 230) * mag);
+    const a = Math.min(.95, 0.10 + mag * 0.72 + depth * 0.12);
+    return `rgba(${lr},${lg},${lb},${a})`;
+  }
+
+  function drawGrid(now) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    const pts = [];
+    for (let j = 0; j <= ROWS; j++) {
+      const v = j / ROWS;
+      const row = [];
+      for (let i = 0; i <= COLS; i++) {
+        const u = i / COLS;
+        const p = project(u, v, 0);
+        const h = heightAt(u, v, p.x, p.y, now);
+        const pp = project(u, v, h);
+        row.push({ x: pp.x, y: pp.y, h, depth: 0.16 + (1 - 0.16) * v });
+      }
+      pts.push(row);
+    }
+    for (let j = 0; j <= ROWS; j++)
+      for (let i = 0; i < COLS; i++) {
+        const a = pts[j][i], b = pts[j][i + 1];
+        ctx.strokeStyle = strokeFor((a.h + b.h) / 2, a.depth);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    for (let i = 0; i <= COLS; i++)
+      for (let j = 0; j < ROWS; j++) {
+        const a = pts[j][i], b = pts[j + 1][i];
+        ctx.strokeStyle = strokeFor((a.h + b.h) / 2, a.depth);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+  }
+
+  function drawNodes(now) {
+    ctx.lineWidth = 1.2;
+    for (const e of edges) {
+      const glow = 0.35 + 0.25 * Math.sin(now * 0.004 + e.phase);
+      ctx.strokeStyle = `rgba(255,176,0,${glow})`;
+      ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y); ctx.stroke();
+    }
+    for (const n of nodes) {
+      const r = 3.5 + Math.sin(now * 0.006 + n.phase) * 1.2;
+      ctx.fillStyle = "rgba(255,176,0,.95)";
+      ctx.shadowColor = "rgba(255,176,0,.8)"; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function loop(now) {
+    drawGrid(now);
+    drawNodes(now);
+    for (let i = ripples.length - 1; i >= 0; i--)
+      if ((now - ripples[i].t0) / 1000 > 2.8) ripples.splice(i, 1);
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- 交互：涟漪 + 节点 ---------- */
+  function addRipple(x, y, amp, speed, w, k) {
+    if (ripples.length > 16) ripples.shift();
+    ripples.push({ x, y, t0: performance.now(), amp, speed, w, k });
+  }
+  function addNode(x, y) {
+    const n = { x, y, phase: Math.random() * 6.28 };
+    nodes.push(n);
+    if (nodes.length > 1) {
+      const others = nodes.slice(0, -1)
+        .map(o => ({ o, d: Math.hypot(o.x - x, o.y - y) }))
+        .sort((a, b) => a.d - b.d).slice(0, 2);
+      for (const { o } of others)
+        edges.push({ a: o, b: n, phase: Math.random() * 6.28 });
+    }
+  }
+
+  if (!reduce) {
+    window.addEventListener("pointermove", (e) => {
+      const now = performance.now();
+      if (now - lastSpawn > 110) {           // 节流：移动时持续激起小涟漪
+        addRipple(e.clientX, e.clientY, 16, 240, 64, 0.05);
+        lastSpawn = now;
+      }
+    });
+    window.addEventListener("pointerdown", (e) => {
+      addRipple(e.clientX, e.clientY, 42, 300, 78, 0.045);  // 点击：大涟漪
+      addNode(e.clientX, e.clientY);
+    });
+  }
+
+  /* ---------- 自定义光标 ---------- */
+  const cursor = document.getElementById("cursor");
+  if (window.matchMedia("(pointer: fine)").matches) {
+    window.addEventListener("pointermove", (e) => {
+      cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    });
+    document.querySelectorAll("a, button").forEach(el => {
+      el.addEventListener("pointerenter", () => cursor.classList.add("dot"));
+      el.addEventListener("pointerleave", () => cursor.classList.remove("dot"));
+    });
+  } else {
+    document.body.classList.remove("cursor-on");
+  }
+
+  /* ---------- HUD 实时遥测（真实模拟，非写死） ---------- */
+  const mNodes = document.getElementById("m-nodes");
+  const mPulse = document.getElementById("m-pulse");
+  const mFreq = document.getElementById("m-freq");
+  const mUp = document.getElementById("m-up");
+  const clock = document.getElementById("clock");
+  const fLat = document.getElementById("f-lat");
+  let upSec = 0;
+  setInterval(() => {
+    upSec++;
+    const mm = String(Math.floor(upSec / 60)).padStart(2, "0");
+    const ss = String(upSec % 60).padStart(2, "0");
+    mUp.textContent = `${mm}:${ss}`;
+    mNodes.textContent = nodes.length;
+    const pulse = Math.round((Math.sin(Date.now() / 320) + 1) / 2 * 100);
+    mPulse.innerHTML = `${pulse}<small>%</small>`;
+    mFreq.innerHTML = `${420 + Math.round(Math.sin(Date.now() / 900) * 12)}<small>Hz</small>`;
+    const lat = (35 + Math.sin(Date.now() / 5000) * 0.4).toFixed(2);
+    fLat.textContent = `${lat}°N`;
+  }, 200);
+
+  setInterval(() => {
+    const d = new Date();
+    clock.textContent = [d.getHours(), d.getMinutes(), d.getSeconds()]
+      .map(n => String(n).padStart(2, "0")).join(":");
+  }, 1000);
+
+  /* ---------- 启动 ---------- */
+  if (reduce) {
+    drawGrid(performance.now());   // 静态一帧，无动画
+  } else {
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(() => document.body.classList.add("run"));  // 编排入场序列
+
+  document.getElementById("activate").addEventListener("click", () => {
+    // “激活”：在中心区域炸开一圈节点 + 涟漪作为反馈
+    const cx = W / 2, cy = H * 0.62;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      addNode(cx + Math.cos(a) * 120, cy + Math.sin(a) * 70);
+      addRipple(cx + Math.cos(a) * 120, cy + Math.sin(a) * 70, 36, 300, 70, 0.045);
+    }
+  });
+})();
+</script>
+</body>
+</html>
