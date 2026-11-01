@@ -1,15 +1,10 @@
-// SuperEdge金丝雀 v1.9.2 - 由 scripts/build.mjs 生成，请勿直接修改本文件
-
-// src/config.js
 var CFG = {
   // ─── 身份 ───
-  id: "adaaa017-c111-4805-9f14-9af616cf9679",
-  // 构建时替换为随机 UUID（标准 36 位带连字符）
+  id: "ad3cf43f-920c-4e55-962c-b2932bb55484",
   // ─── 面板安全 ───
-  panelKey: "a75wzkg5",
-  // 关卡 1：路由暗号，构建时替换为 8 位随机串
-  panelPin: "9yxzr9r5",
-  // 关卡 2：解锁 PIN，构建时替换为 8 位随机串
+  panelKey: "j763rdrc",
+  panelPin: "w3c7zu7h",
+
   // ─── 协议 ───
   maxED: 8 * 1024,
   // ─── 出站 ───
@@ -23,6 +18,7 @@ var CFG = {
   // ─── 上行资源保护 ───
   memBudget: 96 * 1024 * 1024,
   minPerSession: 4 * 1024 * 1024,
+  
   // ─── 路由 ───
   // 接入路径（伪装用）：每条都是有效入口，面板可下拉选择
   // 命名模仿常见 API 服务的长连接/高频端点，分散被探测封锁的风险
@@ -1570,6 +1566,13 @@ var PAGES = {
     body: () => PRIVACY
   }
 };
+var SITE_META = {
+  title: t("meta.home.title"),
+  desc: t("meta.home.desc"),
+  brand: BRAND,
+  h1: t("home.h1"),
+  lead: t("home.lead")
+};
 var ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#4f46e5"/><circle cx="16" cy="16" r="8" fill="none" stroke="#fff" stroke-width="2.5"/><path d="M16 10.5v5.8l3.6 2.2" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>';
 var STATIC = {
   "/favicon.svg": {
@@ -1929,17 +1932,21 @@ var PANEL_INNER_HTML = `<div class=meta id=meta></div>
 </p>`;
 var renderPanel = (encJson, panelHtmlJson) => {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>502 Bad Gateway</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${SITE_META.title}</title>
+<meta name="description" content="${SITE_META.desc}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#f1f1f1;--ink:#333;--muted:#999;--line:#e5e7eb;--accent:#e05454;--accent-hover:#c94848;--warn:#f59e0b;--warn-hover:#d97706;--info:#3b82f6;--mono:ui-monospace,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;justify-content:center;align-items:center;margin:0;padding:24px;line-height:1.5}
-.container{text-align:center;max-width:600px;padding:40px}
-h1{font-size:48px;margin:0 0 10px;color:var(--accent);font-weight:600}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:0;line-height:1.65}
+.container{max-width:960px;margin:0 auto;padding:56px 24px 0}
+h1{font-size:30px;margin:0 0 12px;color:var(--ink);font-weight:600;letter-spacing:-.01em}
 h2{font-size:20px;margin:0 0 20px;color:#666;font-weight:400}
-p{font-size:14px;color:var(--muted);line-height:1.6}
-#trigger{transition:color .2s,font-weight .2s;user-select:none;cursor:pointer}
-#trigger:hover{color:var(--accent);font-weight:600;text-decoration:underline}
+p{font-size:15px;color:var(--muted);line-height:1.7;max-width:640px;margin:0 0 10px}
+#trigger{cursor:pointer;user-select:none}
+.links a{color:var(--accent);text-decoration:none;margin-right:18px;font-size:14px}
+.links a:hover{text-decoration:underline}
+.cover-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:960px;margin:48px auto 0;padding:22px 24px 28px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
 #pn{position:fixed;right:16px;top:16px;width:400px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow-y:auto;padding:18px;background:#fff;border-radius:10px;box-shadow:0 6px 28px rgba(0,0,0,.18);border:1px solid var(--line);display:none;text-align:left;font-size:13px;z-index:9999}
 #pn h3{margin:0 0 6px;font-size:15px;font-weight:600}
 #pn h4{margin:0 0 10px;font-size:13px;font-weight:600}
@@ -2046,7 +2053,12 @@ button.ghost:hover{background:var(--surface-2);color:var(--ink)}
   .pin-toggle{height:40px}
 }
 </style></head><body>
-<div class=container><h1>502</h1><h2>Bad Gateway</h2><p>The server encountered a temporary error and could not complete your request.<br>The client sent an error request to the <span id=trigger>HTTPS</span> server.</p></div>
+<div class=container>
+<h1>${SITE_META.h1}</h1>
+<p>${SITE_META.lead}</p>
+<p class=links><a href=/docs>Docs</a><a href=/status>Status</a><a href=/about>About</a></p>
+</div>
+<footer class=cover-foot><span>&copy; 2026 ${SITE_META.brand} Labs</span><span>This site is served over <span id=trigger>HTTPS</span></span></footer>
 <div id=pn><span class=close id=pnc>&times;</span>
 <div id=lock-layer>
   <h3>\u8282\u70B9\u751F\u6210\u5668</h3>
@@ -2312,6 +2324,7 @@ var getPanel502 = async () => {
 var HTML_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Cache-Control": "no-store",
+  "X-Robots-Tag": "noindex",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer"
 };
@@ -2320,7 +2333,7 @@ var index_default = {
     const url = new URL(req.url);
     if (req.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       if (url.searchParams.get("panel") === CFG.panelKey) {
-        return new Response(await getPanel502(), { status: 502, headers: HTML_HEADERS });
+        return new Response(await getPanel502(), { status: 200, headers: HTML_HEADERS });
       }
       const apiResponse = handleApi(req, url);
       if (apiResponse) return apiResponse;
