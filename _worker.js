@@ -1,104 +1,114 @@
-var CFG = { 
-  id: "1398d0c2-b7c4-432c-869e-3820f7312863",
-  panelKey: "b55nxd2x",
-  panelPin: "6d8awmt7",
-  
-    maxED: 8 * 1024,
-  
+// SuperEdge金丝雀 v1.9.3 - 由 scripts/build.mjs 生成，请勿直接修改本文件
+
+// src/config.js
+var CFG = {
+  // ─── 身份 ───
+  id: "486e7f79-9cbb-40eb-bde5-5678bb3e83bd",
+  // 构建时替换为随机 UUID（标准 36 位带连字符）
+  // ─── 面板安全 ───
+  panelKey: "55v3ehfe",
+  // 入口暗号：决定是否展示面板入口，构建时替换为 8 位随机串
+  panelPin: "e47bqw8u",
+  // 服务端校验口令：与节点UUID 一起校验，构建时替换为 8 位随机串
+  // ─── 协议 ───
+  maxED: 8 * 1024,
+  // ─── 出站 ───
   concur: 1,
   directLoserTimeout: 1500,
   failTTL: 3e4,
   failCacheMax: 128,
   maxStages: 5,
-  
+  // ─── 下行背压停滞超时 ───
   dnStall: 3e4,
-  
+  // ─── 上行资源保护 ───
   memBudget: 96 * 1024 * 1024,
   minPerSession: 4 * 1024 * 1024,
-  
+  // ─── 路由 ───
+  // 接入路径（伪装用）：每条都是有效入口，面板可下拉选择
+  // 命名模仿常见 API 服务的长连接/高频端点，分散被探测封锁的风险
   pathPrefix: [
     "/api/v1/chat",
-    
+    // 模仿 AI 聊天接口
     "/api/v2beta/events",
-    
+    // 模仿 Google 风格事件流接口（SSE 长连接）
     "/telemetry/ingest",
-    
+    // 模仿可观测性平台遥测上报端点
     "/push/gateway"
-    
+    // 模仿推送网关（常驻连接）
   ]
 };
 var PROFILES = {
-  
-  
+  // ─── ll=0 通用（默认，不填等价） ───
+  // 场景：网页、视频、直播（弱网）、不确定
   default: {
     chunk: 64 * 1024,
-    
+    // 64KB  · 匹配经典 TCP 窗口
     dnPack: 48 * 1024,
-    
+    // 48KB  · BDP 折中（50ms × 100Mbps）
     dnTail: 1024,
-    
+    // 1KB   · dnPack 的 2%
     dnQr: 3,
-    
+    // 3 次  · 最多 3ms 延迟
     lowLat: false,
-    
+    // 保留 1ms 合并
     upPack: 32 * 1024,
-    
+    // 32KB  · 匹配常见 HTTP 请求
     dnHigh: 6 * 1024 * 1024,
-    
+    // 6MB   · 4.2 秒抖动容忍（@12Mbps）
     dnLow: 1.5 * 1024 * 1024,
-    
+    // 1.5MB · 4:1 比例
     stagger: 1e3,
-    
+    // 1s    · 平衡延迟与资源
     totalTimeout: 6e3
-    
+    // 6s    · 容忍慢服务器
   },
-  
-  
+  // ─── ll=1 交互（低延迟，SSH / 游戏 / 直播） ───
+  // 场景：SSH、游戏、远程桌面、实时通信、直播（强网）
   lowLat: {
     chunk: 32 * 1024,
-    
+    // 32KB  · 交互典型包大小
     dnPack: 8 * 1024,
-    
+    // 8KB   · 快速发送，不完全关闭合并
     dnTail: 256,
-    
+    // 256B  · dnPack 的 3%
     dnQr: 0,
-    
+    // 0     · 不重试，立即发送
     lowLat: true,
-    
+    // 关闭 1ms 合并（核心）
     upPack: 8 * 1024,
-    
+    // 8KB   · 交互上行流量小
     dnHigh: 2 * 1024 * 1024,
-    
+    // 2MB   · 2.7 秒抖动容忍（@6Mbps）
     dnLow: 512 * 1024,
-    
+    // 512KB · 4:1 比例
     stagger: 200,
-    
+    // 200ms · 快速切换备用
     totalTimeout: 3e3
-    
+    // 3s    · 快速失败
   },
-  
-  
+  // ─── ll=2 下载（高吞吐，App / 大文件） ───
+  // 场景：GooglePlay、AppStore、Steam、网盘大文件
   highSpeed: {
     chunk: 256 * 1024,
-    
+    // 256KB · 匹配高带宽管道
     dnPack: 256 * 1024,
-    
+    // 256KB · 过度合并，帧数最少
     dnTail: 8 * 1024,
-    
+    // 8KB   · dnPack 的 3%
     dnQr: 4,
-    
+    // 4 次  · 适中（8 次是空转）
     lowLat: false,
-    
+    // 保留合并
     upPack: 64 * 1024,
-    
+    // 64KB  · 大文件上传也适用
     dnHigh: 10 * 1024 * 1024,
-    
+    // 10MB  · 0.8 秒容忍（@100Mbps）
     dnLow: 2.5 * 1024 * 1024,
-    
+    // 2.5MB · 4:1 比例
     stagger: 1500,
-    
+    // 1.5s  · 下载不追求低延迟
     totalTimeout: 12e3
-    
+    // 12s   · 容忍慢速下载服务器
   }
 };
 var LL_MAP = {
@@ -121,7 +131,7 @@ if (!Array.isArray(CFG.pathPrefix) || !CFG.pathPrefix.length || CFG.pathPrefix.s
   throw new Error("CFG.pathPrefix \u5FC5\u987B\u662F\u975E\u7A7A\u6570\u7EC4\uFF0C\u6BCF\u9879\u4E3A\u4EE5 / \u5F00\u5934\u4E14\u4E0D\u542B ? # \u7684\u5B57\u7B26\u4E32\uFF08? \u540E\u662F\u53C2\u6570\u4E32\uFF0C\u4E0D\u80FD\u5199\u8FDB\u8DEF\u5F84\uFF09");
 }
 
-
+// src/core.js
 import { connect } from "cloudflare:sockets";
 var S5_GREET_NOAUTH = new Uint8Array([5, 1, 0]);
 var S5_GREET_AUTH = new Uint8Array([5, 2, 0, 2]);
@@ -316,7 +326,7 @@ var findHeaderEnd = (buf) => {
   }
   return -1;
 };
-var PREFIX_MAP =   new WeakMap();
+var PREFIX_MAP = /* @__PURE__ */ new WeakMap();
 async function hTunnelConnect(addressType, addressRemote, portRemote, cfg) {
   const { hostname, port, _httpAuth } = cfg;
   const sock = connect({ hostname, port });
@@ -500,7 +510,7 @@ var connectWithTimeout = (fn, ms, label) => {
     if (timer) clearTimeout(timer);
   });
 };
-var FAIL_CACHE =   new Map();
+var FAIL_CACHE = /* @__PURE__ */ new Map();
 var markFail = (key) => {
   const now = Date.now();
   if (FAIL_CACHE.has(key)) FAIL_CACHE.delete(key);
@@ -547,7 +557,7 @@ var connectToTarget = async (host, port, addressType, strategy) => {
   }
 };
 
-
+// src/session.js
 var VLESS_RESP_V0 = new Uint8Array([0, 0]);
 var VLESS_RESP_V1 = new Uint8Array([1, 0]);
 var activeSessions = 0;
@@ -848,7 +858,7 @@ var runSession = (server, req, strategy) => {
   }
 };
 
-
+// src/i18n.js
 var DEFAULT_LANG = "en";
 var LANGS = [
   { code: "en", htmlLang: "en", short: "EN" },
@@ -858,14 +868,14 @@ var LANGS = [
 ];
 var MESSAGES = {
   en: {
-     
+    /* ── 导航 / 页脚 / 语言控件 ── */
     "nav.docs": "Docs",
     "nav.status": "Status",
     "nav.about": "About",
     "nav.privacy": "Privacy",
     "footer.tagline": "Edge inference and telemetry",
     "lang.aria": "Language",
-     
+    /* ── 元信息（<title> 与 description） ── */
     "meta.home.title": "Lumen \xB7 Edge inference and telemetry",
     "meta.home.desc": "Lumen is an edge AI gateway with streaming completions, trace events, telemetry ingest and alert delivery.",
     "meta.docs.title": "Quickstart \xB7 Lumen Docs",
@@ -879,7 +889,7 @@ var MESSAGES = {
     "meta.404.title": "404 \xB7 Lumen",
     "meta.404.desc": "The requested page was not found.",
     "meta.signin.title": "Sign in \xB7 Lumen",
-     
+    /* ── 首页 ── */
     "home.pill": "General availability \xB7 v3.4",
     "home.h1": "Edge inference with a gateway you can audit.",
     "home.lead": "Lumen runs model requests, event streams and telemetry on the same global edge network. One API surface, per-request tracing, and no cold starts.",
@@ -896,7 +906,7 @@ var MESSAGES = {
     "home.single.title": "A single request",
     "home.single.lead": "All endpoints take a bearer token. The catalogue is public.",
     "home.single.note": 'Browse available models at <a href="/api/v1/models">/api/v1/models</a> or see the <a href="/docs">quickstart</a>.',
-     
+    /* ── 文档 ── */
     "docs.h1": "Quickstart",
     "docs.lead": "Everything is served from the edge. Requests are authenticated with a bearer token issued by your workspace administrator.",
     "docs.auth.title": "1. Authentication",
@@ -923,7 +933,7 @@ var MESSAGES = {
     "docs.authval.public": "Public",
     "docs.error.title": "Error format",
     "docs.error.body": '{"error":{"message":"Missing API key.","type":"invalid_request_error","param":null,"code":"missing_api_key"}}',
-     
+    /* ── 状态 ── */
     "status.h1": "Status",
     "status.ok": "All systems operational",
     "status.checked": "checked just now",
@@ -938,14 +948,14 @@ var MESSAGES = {
     "status.value.operational": "Operational",
     "status.incidents.title": "Past incidents",
     "status.incidents.body": "No incidents reported in the last 30 days. Scheduled maintenance is announced at least 72 hours in advance.",
-     
+    /* ── 关于 ── */
     "about.h1": "About Lumen",
     "about.lead": "Lumen Labs builds a small, opinionated edge platform for teams that ship inference and observability together. We run the gateway, the event pipeline and the telemetry collector on the same network so latency, cost and trace data stay in one place.",
     "about.what.title": "What we do",
     "about.what.body": "Our customers are product teams running assistants, agent workflows and background jobs. They care about p95 latency, per-tenant quota and the ability to replay any request when something goes wrong.",
     "about.contact.title": "Contact",
     "about.contact.body": 'Support and security questions: <a href="mailto:support@lumenlabs.example">support@lumenlabs.example</a>. We publish incident updates on the <a href="/status">status page</a> and document every endpoint in the <a href="/docs">API reference</a>.',
-     
+    /* ── 隐私 ── */
     "privacy.h1": "Privacy policy",
     "privacy.updated": "Last updated: 1 May 2026",
     "privacy.data.title": "Data we process",
@@ -956,13 +966,13 @@ var MESSAGES = {
     "privacy.third.body": "We do not sell data. Infrastructure providers process traffic on our behalf under standard data-processing terms.",
     "privacy.contact.title": "Contact",
     "privacy.contact.body": 'Privacy questions can be sent to <a href="mailto:privacy@lumenlabs.example">privacy@lumenlabs.example</a>.',
-     
+    /* ── 404 ── */
     "nf.h1": "Page not found",
     "nf.body": "The page you requested does not exist or has moved. Check the address, or start from one of these:",
     "nf.home": "Home",
     "nf.docs": "Documentation",
     "nf.status": "Status",
-     
+    /* ── 通用登录页 ── */
     "signin.h1": "Sign in",
     "signin.lead": "Use your workspace credentials to continue.",
     "signin.id": "Workspace ID",
@@ -1070,7 +1080,7 @@ var MESSAGES = {
     "nf.home": "\u9996\u9875",
     "nf.docs": "\u6587\u6863",
     "nf.status": "\u72B6\u6001",
-     
+    /* ── 通用登录页 ── */
     "signin.h1": "\u767B\u5F55",
     "signin.lead": "\u4F7F\u7528\u5DE5\u4F5C\u533A\u51ED\u8BC1\u7EE7\u7EED\u3002",
     "signin.id": "\u5DE5\u4F5C\u533A ID",
@@ -1178,7 +1188,7 @@ var MESSAGES = {
     "nf.home": "\u30DB\u30FC\u30E0",
     "nf.docs": "\u30C9\u30AD\u30E5\u30E1\u30F3\u30C8",
     "nf.status": "\u30B9\u30C6\u30FC\u30BF\u30B9",
-     
+    /* ── 共通サインインページ ── */
     "signin.h1": "\u30B5\u30A4\u30F3\u30A4\u30F3",
     "signin.lead": "\u30EF\u30FC\u30AF\u30B9\u30DA\u30FC\u30B9\u306E\u8A8D\u8A3C\u60C5\u5831\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
     "signin.id": "\u30EF\u30FC\u30AF\u30B9\u30DA\u30FC\u30B9 ID",
@@ -1286,7 +1296,7 @@ var MESSAGES = {
     "nf.home": "\u0413\u043B\u0430\u0432\u043D\u0430\u044F",
     "nf.docs": "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F",
     "nf.status": "\u0421\u0442\u0430\u0442\u0443\u0441",
-     
+    /* ── Общая страница входа ── */
     "signin.h1": "\u0412\u0445\u043E\u0434",
     "signin.lead": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0443\u0447\u0451\u0442\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0440\u0430\u0431\u043E\u0447\u0435\u0433\u043E \u043F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u0430.",
     "signin.id": "ID \u0440\u0430\u0431\u043E\u0447\u0435\u0433\u043E \u043F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u0430",
@@ -1299,7 +1309,7 @@ var MESSAGES = {
   }
 };
 
-
+// src/web.js
 var BRAND = "Lumen";
 var LAYER_CSS = `
 :root{--bg:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#4f46e5;--accent-hover:#4338ca;--soft:#f8fafc}
@@ -1823,7 +1833,7 @@ var webNotFound = (url) => renderPage(
   404
 );
 
-
+// src/api.js
 var JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
@@ -1882,7 +1892,7 @@ var handleApi = (request, url) => {
       service: "lumen-edge",
       version: "3.4.1",
       region: "auto",
-      timestamp: (  new Date()).toISOString()
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   }
   if (path === "/api/v1/models") {
@@ -1918,7 +1928,7 @@ var handleApi = (request, url) => {
   return null;
 };
 
-
+// src/2panel/2panel.html
 var panel_default = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -2176,10 +2186,10 @@ var panel_default = `<!DOCTYPE html>
 </body>
 </html>`;
 
-
+// src/2panel/2panel.css
 var panel_default2 = '*{box-sizing:border-box}\n[hidden]{display:none!important}\n:root{\n  color-scheme:light;\n  --bg:#eef1f8;\n  --card:#ffffff;\n  --card-2:#f6f8fd;\n  --ink:#0d1522;\n  --muted:#54637d;\n  --faint:#6b7b93;\n  --line:#e2e8f2;\n  --line-2:#ccd6e5;\n  --accent:#4f46e5;\n  --accent-h:#4338ca;\n  --accent-soft:#eef0ff;\n  --ok:#136c36;\n  --ok-soft:#e6f6ec;\n  --warn:#a2560a;\n  --warn-soft:#fdf2e2;\n  --danger:#b91c1c;\n  --radius:16px;\n  --radius-sm:9px;\n  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;\n  --shadow:0 18px 40px -30px rgba(13,21,34,.42),0 1px 2px rgba(13,21,34,.05);\n  --ring:0 0 0 3px rgba(79,70,229,.16);\n  --topbar:rgba(255,255,255,.84);\n  --rail:240px;\n  --out:380px;\n}\nhtml.theme-dark{\n  color-scheme:dark;\n  --bg:#080d16;\n  --card:#101826;\n  --card-2:#0c1420;\n  --ink:#e8eef8;\n  --muted:#9aa8bd;\n  --faint:#7b8ca4;\n  --line:#1b2739;\n  --line-2:#29384f;\n  --accent:#7c7cf5;\n  --accent-h:#9595ff;\n  --accent-soft:#171a38;\n  --ok:#6ee7a0;\n  --ok-soft:#10241a;\n  --warn:#fbc46a;\n  --warn-soft:#291f10;\n  --danger:#f87171;\n  --shadow:0 22px 46px -30px rgba(0,0,0,.85),0 1px 3px rgba(0,0,0,.4);\n  --ring:0 0 0 3px rgba(124,124,245,.24);\n  --topbar:rgba(8,13,22,.8);\n}\nhtml,body{min-height:100%}\nhtml{scroll-behavior:smooth}\nbody{\n  margin:0;background:var(--bg);color:var(--ink);\n  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;\n  font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;\n}\n.backdrop{\n  position:fixed;inset:0;z-index:-1;\n  background:\n    radial-gradient(900px 480px at 6% -10%,rgba(79,70,229,.15),transparent 60%),\n    radial-gradient(720px 420px at 98% 0%,rgba(14,165,233,.12),transparent 62%),\n    var(--bg);\n}\n.topbar{\n  position:sticky;top:0;z-index:30;\n  display:flex;align-items:center;justify-content:space-between;gap:16px;\n  height:60px;padding:0 26px;\n  background:var(--topbar);border-bottom:1px solid var(--line);\n  backdrop-filter:saturate(160%) blur(14px);\n}\n.brand{display:flex;align-items:center;gap:10px;min-width:0}\n.mark{\n  width:24px;height:24px;border-radius:8px;flex:0 0 auto;\n  background:linear-gradient(145deg,var(--accent),#22d3ee);\n  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);\n}\n.brand-name{font-size:14px;font-weight:650;letter-spacing:.1px;white-space:nowrap}\n.brand-name i{font-style:normal;font-weight:500;color:var(--muted)}\n.chip{\n  padding:2px 8px;border-radius:999px;font-size:11px;color:var(--accent);\n  background:var(--accent-soft);border:1px solid rgba(79,70,229,.18);white-space:nowrap;\n}\n.top-actions{display:flex;align-items:center;gap:10px}\n.shell{max-width:1320px;margin:0 auto;padding:24px 24px 56px}\n\n/* \u4E09\u680F\u5DE5\u4F5C\u533A */\n.workspace{display:grid;grid-template-columns:var(--rail) minmax(0,1fr) var(--out);gap:22px;align-items:start}\n.rail{position:sticky;top:84px;display:flex;flex-direction:column;gap:2px;padding:14px 10px}\n.rail-title{margin:0 0 8px;padding:0 12px;font-size:11px;letter-spacing:1.2px;color:var(--faint);font-weight:600}\n.rail-item{\n  display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;\n  color:var(--muted);text-decoration:none;transition:background .15s,color .15s;\n}\n.rail-item .idx{font-family:var(--mono);font-size:11px;color:var(--faint)}\n.rail-item .txt{font-size:13.5px;font-weight:550}\n.rail-item:hover{background:var(--card);color:var(--ink)}\n.rail-item.is-active{background:var(--card);color:var(--accent);box-shadow:var(--shadow)}\n.rail-item.is-active .idx{color:var(--accent)}\n.rail-foot{\n  margin-top:14px;padding:12px 12px 0;border-top:1px solid var(--line);\n  display:flex;justify-content:space-between;font-size:11px;color:var(--faint);\n}\n.rail-ver{font-family:var(--mono)}\n.stack{display:flex;flex-direction:column;gap:18px;min-width:0}\n.block{\n  padding:22px 22px 20px;background:var(--card);border:1px solid var(--line);\n  border-radius:var(--radius);box-shadow:var(--shadow);scroll-margin-top:76px;\n}\n.block-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}\n.idx-line{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.6px;color:var(--accent);margin-bottom:4px}\n.block-head h2,.output-head h2{margin:0;font-size:16px;letter-spacing:-.2px;line-height:1.35}\n.tag{\n  flex:0 0 auto;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;\n  color:var(--muted);background:var(--card-2);border:1px solid var(--line);\n}\n.tag.ok{color:var(--ok);background:var(--ok-soft);border-color:transparent}\n.tag.stale{color:var(--warn);background:var(--warn-soft);border-color:transparent}\n.pill{\n  padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;\n  color:var(--muted);background:var(--card-2);border:1px solid var(--line);\n}\n.pill.ok{color:var(--ok);background:var(--ok-soft);border-color:transparent}\n.pill.stale{color:var(--warn);background:var(--warn-soft);border-color:transparent}\n/* \u8868\u5355 */\n.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;min-width:0}\n.field>label,#ll-label{font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.2px}\ninput[type=text]{\n  width:100%;height:40px;padding:0 12px;\n  border:1px solid var(--line-2);border-radius:var(--radius-sm);\n  background:var(--card-2);color:var(--ink);\n  font-family:var(--mono);font-size:13px;outline:none;\n  transition:border-color .15s,background .15s,box-shadow .15s;\n}\ninput::placeholder{color:var(--faint);font-family:inherit}\ninput[type=text]:focus{\n  border-color:var(--accent);background:var(--card);box-shadow:var(--ring);\n}\ninput[readonly]{cursor:text}\n.help{margin:0;font-size:12px;line-height:1.6;color:var(--faint)}\n.row{display:flex;gap:12px;align-items:flex-start}\n.row>.field{flex:1;min-width:0}\n.row>.field.narrow{flex:0 0 104px}\n.row>.field.grow{flex:1.5}\n.sub-head{\n  margin:4px 0 12px;padding-top:14px;border-top:1px dashed var(--line);\n  font-size:11.5px;letter-spacing:.8px;font-weight:600;color:var(--faint);\n}\n\n/* \u9009\u9879\u5361\u7247 */\n.sub-label{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--muted)}\n.picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}\n.picker.two{grid-template-columns:repeat(2,minmax(0,1fr))}\n.opt{\n  position:relative;display:block;padding:11px 12px;cursor:pointer;\n  background:var(--card-2);border:1px solid var(--line-2);border-radius:12px;\n  transition:border-color .15s,background .15s,box-shadow .15s,transform .1s;\n}\n.opt:hover{border-color:var(--muted)}\n.opt input{position:absolute;width:0;height:0;opacity:0}\n.opt-body{display:flex;flex-direction:column;gap:2px;min-width:0}\n.opt-body b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.opt-body em{font-style:normal;font-size:11px;color:var(--faint)}\n.opt.mono .opt-body b{font-family:var(--mono);font-size:12px;font-weight:500}\n.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}\n.opt:has(input:checked) b{color:var(--accent)}\n.opt:has(input:checked) em{color:var(--accent)}\n.opt:has(input:focus-visible){box-shadow:var(--ring)}\n.path-group .opt-body b{font-size:12px}\n\n.hint-box{\n  margin:2px 0 14px;padding:10px 12px;border-radius:10px;font-size:12.5px;line-height:1.6;\n  color:var(--muted);background:var(--card-2);border:1px dashed var(--line-2);\n}\n.hint-box.warn{color:var(--warn);background:var(--warn-soft);border-color:rgba(162,86,10,.28)}\n.ll-table{\n  display:grid;grid-template-columns:1fr auto;gap:6px 16px;\n  margin:0 0 14px;padding:10px 12px;\n  background:var(--card-2);border:1px solid var(--line);border-radius:10px;\n}\n.ll-row{display:contents}\n.ll-table span{font-size:12px;color:var(--faint)}\n.ll-table b{font-family:var(--mono);font-size:12px;font-weight:600;text-align:right}\n.collapse{display:none!important}\n.collapse.open{display:block!important;margin-top:6px}\n.err{min-height:16px;font-size:12px;color:var(--danger)}\n\n/* \u8EAB\u4EFD */\n.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\n.fact{\n  display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;\n  background:var(--card-2);border:1px solid var(--line);border-radius:11px;\n}\n.fact.wide{grid-column:1/-1}\n.fact .k{flex:0 0 auto;font-size:11.5px;color:var(--faint)}\n.fact code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:12.5px}\n.fact .mini{height:28px;padding:0 9px;font-size:11px}\n\n/* \u6309\u94AE */\n.primary{\n  height:40px;padding:0 20px;border:0;border-radius:var(--radius-sm);\n  background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;\n  cursor:pointer;transition:background .15s,transform .1s;\n}\n.primary:hover{background:var(--accent-h)}\n.primary:active{transform:translateY(1px)}\n.primary:disabled{opacity:.62;cursor:default;transform:none}\n#gen-btn.dirty{background:var(--warn)}\n#gen-btn.dirty:hover{background:#8a4a08}\n.ghost{\n  height:40px;padding:0 16px;border-radius:var(--radius-sm);\n  border:1px solid var(--line-2);background:transparent;color:var(--muted);\n  font-size:13px;cursor:pointer;transition:border-color .15s,color .15s;\n}\n.ghost:hover{border-color:var(--accent);color:var(--accent)}\n.ghost.small{height:30px;padding:0 11px;font-size:12px}\n.mini{\n  flex:0 0 auto;height:40px;padding:0 12px;border-radius:var(--radius-sm);\n  border:1px solid var(--line-2);background:var(--card);color:var(--muted);\n  font-size:12px;cursor:pointer;white-space:nowrap;\n}\n.mini:hover{border-color:var(--accent);color:var(--accent)}\n\n/* \u64CD\u4F5C\u680F */\n.actionbar{\n  position:sticky;bottom:10px;z-index:20;\n  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;\n  padding:12px 16px;background:var(--card);border:1px solid var(--line);\n  border-radius:14px;box-shadow:0 12px 30px -18px rgba(13,21,34,.4);\n}\n.actionbar-info{display:flex;align-items:center;gap:10px;min-width:0}\n.actionbar-text{font-size:12px;color:var(--faint)}\n.actionbar-btns{display:flex;gap:10px;margin-left:auto}\n/* \u8F93\u51FA\u680F */\n.output{\n  position:sticky;top:84px;\n  display:flex;flex-direction:column;\n  padding:20px;background:var(--card);border:1px solid var(--line);\n  border-radius:var(--radius);box-shadow:var(--shadow);\n}\n.output-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}\n.summary{\n  display:flex;flex-direction:column;gap:6px;margin-bottom:14px;padding:10px 12px;\n  background:var(--card-2);border:1px solid var(--line);border-radius:11px;\n}\n.summary span{display:flex;align-items:baseline;justify-content:space-between;gap:10px;min-width:0}\n.summary i{flex:0 0 auto;font-style:normal;font-size:11.5px;color:var(--faint)}\n.summary b{min-width:0;font-weight:600;font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n.out-row{display:flex;gap:8px}\n.out-row input{flex:1;min-width:0}\n.qr-box{\n  margin:4px 0 12px;padding:16px;border-radius:12px;\n  background:var(--card-2);border:1px solid var(--line);\n  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:200px;\n}\n.qr-box img{width:196px;height:196px;border-radius:10px;background:#fff;padding:6px;cursor:zoom-in}\n.qr-tip{font-size:12px;color:var(--faint);text-align:center}\n.qr-tip.err{color:var(--danger)}\n.qr-box .ghost.small{min-width:132px}\n.usage{font-size:12px;line-height:1.65;color:var(--muted)}\n.warn{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--warn)}\n.foot{\n  display:flex;align-items:center;justify-content:space-between;gap:12px;\n  margin-top:18px;padding:0 4px;font-size:11.5px;color:var(--faint);\n}\n.qr-zoom{\n  position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;\n  background:rgba(6,10,18,.72);backdrop-filter:blur(4px);padding:24px;cursor:zoom-out;\n}\n.qr-zoom.open{display:flex}\n.qr-zoom img{width:min(78vw,78vh);height:min(78vw,78vh);background:#fff;border-radius:16px;padding:12px}\n\n/* \u54CD\u5E94\u5F0F */\n@media (max-width:1180px){\n  .workspace{grid-template-columns:200px minmax(0,1fr)}\n  .output{position:static;grid-column:1/-1}\n  .output .qr-box{min-height:180px}\n}\n@media (max-width:900px){\n  .workspace{grid-template-columns:1fr;gap:16px}\n  .rail{\n    position:sticky;top:60px;z-index:25;flex-direction:row;gap:6px;overflow-x:auto;\n    padding:12px 2px;background:var(--topbar);border-bottom:1px solid var(--line);\n    backdrop-filter:saturate(160%) blur(12px);-webkit-overflow-scrolling:touch;\n  }\n  .rail-title,.rail-foot{display:none}\n  .rail-item{flex:0 0 auto;padding:7px 12px;border:1px solid var(--line-2);border-radius:999px}\n  .rail-item.is-active{box-shadow:none}\n  .rail-item .txt{font-size:12.5px}\n  .actionbar{bottom:8px}\n}\n@media (max-width:600px){\n  .topbar{height:56px;padding:0 14px}\n  .topbar .chip{display:none}\n  #theme-btn{padding:0 9px}\n  .brand-name{font-size:13px}\n  .shell{padding:14px 12px 40px}\n  .block,.output{padding:18px 16px}\n  .picker,.picker.two{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .picker.three{grid-template-columns:1fr}\n  .facts{grid-template-columns:1fr}\n  input[type=text]{font-size:16px;height:44px}\n  .row{flex-wrap:wrap}\n  .row>.field{flex:1 1 100%}\n  .row>.field.narrow{flex:0 0 104px}\n  .actionbar{padding:10px 12px;gap:10px}\n  .actionbar-text{display:none}\n  .actionbar-btns{flex:1;margin-left:0}\n  .actionbar-btns .primary{flex:1}\n  .out-row{flex-wrap:wrap}\n  .out-row .mini{width:100%;height:38px}\n  .foot{flex-direction:column;align-items:flex-start;gap:4px}\n}\n@media (prefers-reduced-motion:reduce){\n  *{transition:none!important;animation:none!important}\n}';
 
-
+// src/2panel/2panel.js
 var panel_default3 = `(function () {
   'use strict';
 
@@ -2721,7 +2731,7 @@ var panel_default3 = `(function () {
 })();
 `;
 
-
+// src/2panel.js
 var esc2 = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 var PATH_OPTIONS = CFG.pathPrefix.map((p, i) => `<label class="opt mono"><input type="radio" name="path" value="${esc2(p)}"${i === 0 ? " checked" : ""}><span class="opt-body"><b>${esc2(p)}</b></span></label>`).join("");
 var LL_DATA = Object.fromEntries(
@@ -2742,7 +2752,7 @@ var renderPanel2 = (nodeIdJson) => panel_default.split("<!-- __PANEL2_STYLE__ --
 var LL_PROFILES = ${JSON.stringify(LL_DATA)};</script>`
 ).split("<!-- __PANEL2_SCRIPT__ -->").join(`<script>${panel_default3}</script>`).split("__PATH_OPTIONS__").join(PATH_OPTIONS);
 
-
+// src/index.js
 var parseStrategy = (searchParams) => {
   const llRaw = searchParams.get("ll") || "0";
   const profileKey = LL_MAP[llRaw] || "default";
@@ -3439,7 +3449,7 @@ var hasSession = (req) => verifySession(readCookie(req, SESSION_COOKIE));
 var secureFlag = (url) => url.protocol === "https:" ? "; Secure" : "";
 var sessionCookie = (token, url) => `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL}${secureFlag(url)}`;
 var clearCookie = (url) => `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag(url)}`;
-var authFailures =   new Map();
+var authFailures = /* @__PURE__ */ new Map();
 var pruneFailures = (now) => {
   for (const [key, rec] of authFailures) {
     if (now >= rec.reset) authFailures.delete(key);
@@ -3489,7 +3499,7 @@ var AUTH_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer"
 };
-var FORM_TYPES =   new Set(["application/x-www-form-urlencoded", "multipart/form-data"]);
+var FORM_TYPES = /* @__PURE__ */ new Set(["application/x-www-form-urlencoded", "multipart/form-data"]);
 var entryPath = (next) => next === "2" ? "/?2panel=" + CFG.panelKey : "/?panel=" + CFG.panelKey;
 var handleSignin = async (req, url) => {
   const ip = clientIp(req);
