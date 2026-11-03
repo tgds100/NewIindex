@@ -1,4 +1,6 @@
-// SuperEdge金丝雀 v1.9.3 - 由 scripts/build.mjs 生成，请勿直接修改本文件
+/* SuperEdge金丝雀 v1.9.3
+ * 🦄 推荐使用 Pages 方式部署 🍑
+*/
 
 // src/config.js
 var CFG = {
